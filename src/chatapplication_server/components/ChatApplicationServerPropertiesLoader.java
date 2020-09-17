@@ -85,6 +85,9 @@ public class ChatApplicationServerPropertiesLoader implements IComponent
              
              if ( !checkPropertyValue( "Client.Username", CSProps.getProperty( "ClientUsername" ) ) )
                 configManager.setValue( "Client.Username", "Anonymous" );
+
+            if ( !checkPropertyValue( "Client.ServerSharedSecret", CSProps.getProperty( "ClientServerSharedSecret" ) ) )
+                configManager.setValue( "Client.ServerSharedSecret", "secretKey" );
         }
         catch( IOException e )
         {

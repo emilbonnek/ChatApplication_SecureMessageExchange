@@ -6,7 +6,9 @@
 package chatapplication_server.components.ServerSocketEngine;
 
 import SocketActionMessages.ChatMessage;
+import chatapplication_server.ServerSecretManager;
 import chatapplication_server.components.ConfigManager;
+import chatapplication_server.encryption.AES;
 import chatapplication_server.statistics.ServerStatistics;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -319,9 +321,9 @@ public class SocketConnectionHandler implements Runnable
             {  
                 /** Wait until there is something in the stream to be read... */
                 cm = ( ChatMessage )socketReader.readObject();
-                
-                String message = cm.getMessage();
-                
+
+                String message = AES.decrypt(cm.getMessage(), ServerSecretManager.getSecret(getUserName()));
+
                 // Switch on the type of message receive
                 switch(cm.getType()) 
                 {

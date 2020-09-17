@@ -11,6 +11,7 @@ import chatapplication_server.components.ConfigManager;
 import chatapplication_server.components.ServerSocketEngine.SocketServerEngine;
 import chatapplication_server.components.ServerSocketEngine.SocketServerGUI;
 import chatapplication_server.components.base.GenericThreadedComponent;
+import chatapplication_server.encryption.AES;
 import chatapplication_server.exception.ComponentInitException;
 import chatapplication_server.statistics.ServerStatistics;
 import java.io.IOException;
@@ -104,7 +105,7 @@ public class ClientEngine extends GenericThreadedComponent
             socketReader = new ObjectInputStream( socket.getInputStream() );
             
             /** Start the ListeFromServer thread... */
-            new ListenFromServer().start();
+            new ListenFromServer(configManager.getValue("Client.ServerSharedSecret")).start();
         }
         catch ( IOException ioe )
         {
@@ -189,10 +190,10 @@ public class ClientEngine extends GenericThreadedComponent
                     sendMessage(new ChatMessage(ChatMessage.WHOISIN, ""));				
             }
             else if (msg.equalsIgnoreCase("PRIVATEMESSAGE")){				// default to ordinary message
-                    sendMessage(new ChatMessage(ChatMessage.PRIVATEMESSAGE, msg));
+                    sendMessage(new ChatMessage(ChatMessage.PRIVATEMESSAGE, AES.encrypt(msg, configManager.getValue("Client.ServerSharedSecret"))));
             }
             else  {				// default to ordinary message
-                    sendMessage(new ChatMessage(ChatMessage.MESSAGE, msg));
+                    sendMessage(new ChatMessage(ChatMessage.MESSAGE, AES.encrypt(msg, configManager.getValue("Client.ServerSharedSecret"))));
             }
         }
         

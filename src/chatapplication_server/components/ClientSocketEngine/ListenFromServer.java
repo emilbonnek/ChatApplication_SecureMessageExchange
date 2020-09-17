@@ -6,6 +6,7 @@
 package chatapplication_server.components.ClientSocketEngine;
 
 import chatapplication_server.ComponentManager;
+import chatapplication_server.encryption.AES;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
@@ -15,6 +16,11 @@ import java.io.ObjectInputStream;
  */
 public class ListenFromServer extends Thread 
 {
+    private String secretKey;
+    public ListenFromServer(String secretKey) {
+        this.secretKey = secretKey;
+    }
+
     public void run()
     {
         while(true) {
@@ -24,8 +30,8 @@ public class ListenFromServer extends Thread
                 {
                     try
                     {
-                        String msg = (String) sInput.readObject();
-                    
+                        String msg = AES.decrypt((String) sInput.readObject(), secretKey);
+
                         if(msg.contains( "#" ))
                         {
                             ClientSocketGUI.getInstance().appendPrivateChat(msg + "\n");

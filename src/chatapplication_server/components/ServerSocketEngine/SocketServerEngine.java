@@ -6,8 +6,10 @@
 package chatapplication_server.components.ServerSocketEngine;
 
 import chatapplication_server.ComponentManager;
+import chatapplication_server.ServerSecretManager;
 import chatapplication_server.components.ConfigManager;
 import chatapplication_server.components.base.GenericThreadedComponent;
+import chatapplication_server.encryption.AES;
 import chatapplication_server.exception.ComponentInitException;
 import chatapplication_server.statistics.ServerStatistics;
 import java.net.ServerSocket;
@@ -342,7 +344,7 @@ public class SocketServerEngine extends GenericThreadedComponent
 
             /** If this is the correct client... */
             if ( sch.getHandleSocket().getPort() == PortNo )
-                sch.writeMsg( msg );
+                sch.writeMsg(AES.encrypt(msg, ServerSecretManager.getSecret(sch.getUserName())));
         }
     }
     
@@ -384,7 +386,7 @@ public class SocketServerEngine extends GenericThreadedComponent
             /** Get a Connection Handler reference... */
             SocketConnectionHandler sch = ( SocketConnectionHandler )occupance.get( i );
 
-           sch.writeMsg( messageLf );
+           sch.writeMsg(AES.encrypt(messageLf, ServerSecretManager.getSecret(sch.getUserName())));
         }
     }
     
