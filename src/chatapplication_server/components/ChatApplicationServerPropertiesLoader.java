@@ -81,10 +81,10 @@ public class ChatApplicationServerPropertiesLoader implements IComponent
                 configManager.setValue( "Server.PortNumber", "1500" );
              
              if ( !checkPropertyValue( "Server.Address", CSProps.getProperty( "ServerAddress" ) ) )
-                configManager.setValue( "Server.PortNumber", "localhost" );
+                configManager.setValue( "Server.Address", "localhost" );
              
              if ( !checkPropertyValue( "Client.Username", CSProps.getProperty( "ClientUsername" ) ) )
-                configManager.setValue( "Server.PortNumber", "Anonymous" );
+                configManager.setValue( "Client.Username", "Anonymous" );
         }
         catch( IOException e )
         {
