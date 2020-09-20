@@ -7,6 +7,8 @@ package chatapplication_server.components.ClientSocketEngine;
 
 import SocketActionMessages.ChatMessage;
 import chatapplication_server.components.ConfigManager;
+import chatapplication_server.encryption.AES;
+import chatapplication_server.encryption.DiffieHellman;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.GridLayout;
@@ -26,8 +28,11 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
 import java.net.*;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -37,6 +42,28 @@ public class P2PClient extends JFrame implements ActionListener
 {
     private String host;
     private String port;
+
+    // Port used to send messages
+    private int senderPort = -1;
+
+    // Maps used to keep info about different addresses we have been communicating with
+    private HashMap<String,String> addressForAddress = new HashMap<String, String>();
+    private HashMap<String,String> secretForAddress = new HashMap<String, String>();
+    private HashMap<String,Integer> pForAddress = new HashMap<String, Integer>();
+    private HashMap<String,Integer> gForAddress = new HashMap<String, Integer>();
+    private HashMap<String,Integer> aForAddress = new HashMap<String, Integer>();
+    private HashMap<String,Integer> AForAddress = new HashMap<String, Integer>();
+    private HashMap<String,Integer> bForAddress = new HashMap<String, Integer>();
+    private HashMap<String,Integer> BForAddress = new HashMap<String, Integer>();
+
+    // These regular expressions are used to parse messages for numbers
+    Pattern receivePortMessagePattern = Pattern.compile(".*R_PORT=(\\d+).*");
+    Pattern receivePortRequestPattern = Pattern.compile(".*R_PORT\\?.*");
+    Pattern pMessagePattern = Pattern.compile(".*p=(\\d+).*");
+    Pattern gMessagePattern = Pattern.compile(".*g=(\\d+).*");
+    Pattern AMessagePattern = Pattern.compile(".*A=(\\d+).*");
+    Pattern BMessagePattern = Pattern.compile(".*B=(\\d+).*");
+
     private final JTextField tfServer;
     private final JTextField tfPort;
     private final JTextField tfsPort;
@@ -121,7 +148,22 @@ public class P2PClient extends JFrame implements ActionListener
                 display( "Cannot give the same port number as the Chat Application Server - Please give the port number of the peer client to communicate!\n" );
                 return;
             }
-            this.send(tf.getText());
+            String receiveAddress = localhostUnifyName(tfServer.getText())+":"+tfPort.getText();
+            if (this.secretForAddress.containsKey(receiveAddress)) {
+                // Already have shared secret with recipient, encrypt...
+                send(AES.encrypt(tf.getText(), secretForAddress.get(receiveAddress)));
+                display("you: "+tf.getText());
+
+            } else {
+                // No shared secret with recipient
+                if (keepGoing) {
+                    // Port is open, we are ready to setup negotiation of a shared secret
+                    send("R_PORT="+tfsPort.getText()+",R_PORT?");
+                } else {
+                    // Port is not open, we can't start negotiation of a shared secret
+                    display("You need to open a port in order to negotiate a secret with recipient");
+                }
+            }
         }
         if(o == start){
             new ListenFromClient().start();
@@ -134,12 +176,20 @@ public class P2PClient extends JFrame implements ActionListener
     }
     
     public boolean send(String str){
-        Socket socket;
+        Socket socket = new Socket();
         ObjectOutputStream sOutput;		// to write on the socket
         // try to connect to the server
-            try {
-                    socket = new Socket(tfServer.getText(), Integer.parseInt(tfPort.getText()));
-            } 
+        try {
+                socket.setSoLinger(true, 0);
+                socket.setSoTimeout(0);
+
+                if (senderPort != -1) {
+                    socket.bind(new InetSocketAddress(senderPort));
+                }
+                socket.connect(new InetSocketAddress(tfServer.getText(), Integer.parseInt(tfPort.getText())));
+                senderPort = socket.getLocalPort();
+
+            }
             // if it failed not much I can so
             catch(Exception ec) {
                     display("Error connectiong to server:" + ec.getMessage() + "\n");
@@ -167,6 +217,15 @@ public class P2PClient extends JFrame implements ActionListener
         }
 
          return true;
+    }
+
+    // Helper method to unify hostnames of localhost.
+    // Sometimes it is referred to as localhost and sometimes as 127.0.0.1.
+    private String localhostUnifyName(String hostname) {
+        if (hostname.equals("localhost")) {
+            return "127.0.0.1";
+        }
+        return hostname;
     }
     
     private class ListenFromClient extends Thread{
@@ -202,10 +261,11 @@ public class P2PClient extends JFrame implements ActionListener
                                     display("Exception creating new Input/output Streams: " + eIO);
                             }
 
+                            String msg = new String();
                             try {
-                                String msg = ((ChatMessage) sInput.readObject()).getMessage();
-                                System.out.println("Msg:"+msg);
-                                display(socket.getInetAddress()+": " + socket.getPort() + ": " + msg);
+                                msg = ((ChatMessage) sInput.readObject()).getMessage();
+                                display(socket.getInetAddress()+":" + socket.getPort() + ": " + msg);
+
                                 sInput.close();
                                 socket.close();
                             } catch (IOException ex) {
@@ -213,6 +273,90 @@ public class P2PClient extends JFrame implements ActionListener
                             } catch (ClassNotFoundException ex) {
                                 Logger.getLogger(P2PClient.class.getName()).log(Level.SEVERE, null, ex);
                             }
+
+
+                            String senderAddress = socket.getInetAddress()+":"+socket.getPort();
+                            if (addressForAddress.containsKey(senderAddress)) {
+                                String receiveAddress = addressForAddress.get(senderAddress);
+                                if (secretForAddress.containsKey(receiveAddress)) {
+                                    // Has a shared secret with this sender, decrypt...
+                                    display(socket.getInetAddress()+":" + socket.getPort() + ": " + AES.decrypt(msg, secretForAddress.get(receiveAddress)));
+
+                                } else {
+                                    // We don't have a shared secret with this address
+                                    Matcher pMessageMatcher = pMessagePattern.matcher(msg);
+                                    Matcher gMessageMatcher = gMessagePattern.matcher(msg);
+                                    if (pMessageMatcher.find() && gMessageMatcher.find()) {
+                                        // Negotiation step 2
+                                        // They sent us p and g
+                                        pForAddress.put(receiveAddress, Integer.parseInt(pMessageMatcher.group(1)));
+                                        gForAddress.put(receiveAddress, Integer.parseInt(gMessageMatcher.group(1)));
+                                        // We get to pick a
+                                        int a = DiffieHellman.pickA();
+                                        int A = ((int) Math.pow(gForAddress.get(receiveAddress),a))% pForAddress.get(receiveAddress);
+                                        aForAddress.put(receiveAddress, a);
+                                        AForAddress.put(receiveAddress, A);
+                                        send("A="+A);
+                                    }
+
+                                    Matcher AMessageMatcher = AMessagePattern.matcher(msg);
+                                    if (AMessageMatcher.find()) {
+                                        // Negotiation step 3
+                                        // They sent us A
+                                        AForAddress.put(receiveAddress, Integer.parseInt(AMessageMatcher.group(1)));
+                                        // We get to pick b
+                                        int b = DiffieHellman.pickB();
+                                        int B = ((int) Math.pow(gForAddress.get(receiveAddress),b))% pForAddress.get(receiveAddress);
+                                        bForAddress.put(receiveAddress, b);
+                                        BForAddress.put(receiveAddress, B);
+                                        send("B="+B);
+                                        // We can calculate secret now
+                                        int s = ((int) Math.pow(AForAddress.get(receiveAddress),b))% pForAddress.get(receiveAddress);
+                                        String secret = Integer.toBinaryString(s);;
+                                        secretForAddress.put(receiveAddress, secret);
+                                        display("s = "+s);
+                                        display("secret = "+secret);
+                                    }
+
+                                    Matcher BMessageMatcher = BMessagePattern.matcher(msg);
+                                    if (BMessageMatcher.find()) {
+                                        // Negotiation step 4
+                                        // They send us B
+                                        BForAddress.put(receiveAddress, Integer.parseInt(BMessageMatcher.group(1)));
+                                        // We can calculate secret now
+                                        int s = ((int) Math.pow(BForAddress.get(receiveAddress), aForAddress.get(receiveAddress)))% pForAddress.get(receiveAddress);
+                                        String secret = Integer.toBinaryString(s);
+                                        secretForAddress.put(receiveAddress, secret);
+                                        display("s = "+s);
+                                        display("secret = "+secret);
+                                    }
+                                }
+                            } else {
+                                // No receive address stored for this sender
+                                Matcher receivePortMessageMatcher = receivePortMessagePattern.matcher(msg);
+                                if (receivePortMessageMatcher.matches()) {
+                                    // Receive address found in message
+                                    String receiveAddress = socket.getInetAddress().toString().substring(1)+":"+receivePortMessageMatcher.group(1);
+                                    addressForAddress.put(senderAddress, receiveAddress);
+                                    addressForAddress.put(receiveAddress, senderAddress);
+
+                                    Matcher receivePortRequestMatcher = receivePortRequestPattern.matcher(msg);
+                                    if (receivePortRequestMatcher.find()) {
+                                        // The sender also requests our receive address (to match it to our sender address)
+                                        send("R_PORT="+tfsPort.getText());
+                                    } else {
+                                        // The sender did not request our receive address
+                                        // Negotiation step 1
+                                        // We get to pick p and g
+                                        int p = DiffieHellman.pickP();
+                                        int g = DiffieHellman.pickG(p);
+                                        pForAddress.put(receiveAddress, p);
+                                        gForAddress.put(receiveAddress, g);
+                                        send("p="+p+",g="+g);
+                                    }
+                                }
+                            }
+
 
                         }
 		}
