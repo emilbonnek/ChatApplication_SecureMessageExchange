@@ -1,32 +1,29 @@
 package chatapplication_server.encryption;
 
-// This class helps with implementing aspects the DiffieHellman protocol
+import java.util.Random;
+
+// This class helps with implementing aspects of the Diffie-Hellman protocol
 public class DiffieHellman {
-    public static boolean isCoprime(int a, int b) {
-        return GreatestCommonDenominator(a, b) == 1;
+    /* p and g are public parameters, therefore hardcoded for clients to share them.
+    * p is a prime number an g is a number which is coprime to p-1.
+    * Large values of p makes it computationally infeasible to break, which is what the following tries to simulate
+    * */
+    public static int chooseP() {
+        return 429437291;
     }
-    private static int GreatestCommonDenominator(int a, int b) {
-        while (a != 0 && b != 0) {
-            if (a > b) {
-                a %= b;
-            } else {
-                a %= b;
-            }
-        }
-        return Math.max(a, b);
+    public static int chooseG() {
+        return 867421387;
     }
 
-    // TODO these functions should be be dynamic
-    public static int pickP() {
-        return 23;
+    /* a and b are local parameters which are chosen randomly.
+    It should hold that a and b are elements of {1, 2, ..., p-1}
+     * */
+    public static int chooseSmallA() {
+        Random random = new Random();
+        return random.nextInt(chooseP() - 1) + 1;
     }
-    public static int pickG(int P) {
-        return 5;
-    }
-    public static int pickA() {
-        return 4;
-    }
-    public static int pickB() {
-        return 3;
+    public static int chooseSmallB() {
+        Random random = new Random();
+        return random.nextInt(chooseP() - 1) + 1;
     }
 }

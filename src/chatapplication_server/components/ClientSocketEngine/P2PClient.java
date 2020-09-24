@@ -292,7 +292,7 @@ public class P2PClient extends JFrame implements ActionListener
                                         pForAddress.put(receiveAddress, Integer.parseInt(pMessageMatcher.group(1)));
                                         gForAddress.put(receiveAddress, Integer.parseInt(gMessageMatcher.group(1)));
                                         // We get to pick a
-                                        int a = DiffieHellman.pickA();
+                                        int a = DiffieHellman.chooseSmallA();
                                         int A = ((int) Math.pow(gForAddress.get(receiveAddress),a))% pForAddress.get(receiveAddress);
                                         aForAddress.put(receiveAddress, a);
                                         AForAddress.put(receiveAddress, A);
@@ -305,7 +305,7 @@ public class P2PClient extends JFrame implements ActionListener
                                         // They sent us A
                                         AForAddress.put(receiveAddress, Integer.parseInt(AMessageMatcher.group(1)));
                                         // We get to pick b
-                                        int b = DiffieHellman.pickB();
+                                        int b = DiffieHellman.chooseSmallB();
                                         int B = ((int) Math.pow(gForAddress.get(receiveAddress),b))% pForAddress.get(receiveAddress);
                                         bForAddress.put(receiveAddress, b);
                                         BForAddress.put(receiveAddress, B);
@@ -348,8 +348,8 @@ public class P2PClient extends JFrame implements ActionListener
                                         // The sender did not request our receive address
                                         // Negotiation step 1
                                         // We get to pick p and g
-                                        int p = DiffieHellman.pickP();
-                                        int g = DiffieHellman.pickG(p);
+                                        int p = DiffieHellman.chooseP();
+                                        int g = DiffieHellman.chooseG();
                                         pForAddress.put(receiveAddress, p);
                                         gForAddress.put(receiveAddress, g);
                                         send("p="+p+",g="+g);

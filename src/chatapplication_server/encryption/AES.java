@@ -1,68 +1,57 @@
 package chatapplication_server.encryption;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Base64;
 
-import javax.crypto.Cipher;
-import javax.crypto.spec.SecretKeySpec;
-
-// This is an implementation of AES encryption
-// It has been copied from https://howtodoinjava.com/java/java-security/java-aes-encryption-example/
-// We have read the code and sufficiently understand the algorithm
-
 public class AES {
 
-    private static SecretKeySpec secretKey;
+    private static SecretKeySpec secretKeySpec;
     private static byte[] key;
 
-    public static void setKey(String myKey)
-    {
+    public static void setSecretKey(String secret) {
+
         MessageDigest sha = null;
         try {
-            key = myKey.getBytes("UTF-8");
+            key = secret.getBytes("UTF-8");
             sha = MessageDigest.getInstance("SHA-1");
             key = sha.digest(key);
             key = Arrays.copyOf(key, 16);
-            secretKey = new SecretKeySpec(key, "AES");
+            secretKeySpec = new SecretKeySpec(key, "AES");
         }
-        catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        catch (UnsupportedEncodingException e) {
+        catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
             e.printStackTrace();
         }
     }
 
-    public static String encrypt(String strToEncrypt, String secret)
-    {
-        try
-        {
-            setKey(secret);
+    public static String encrypt(String plaintext, String secret) {
+
+        try {
+            setSecretKey(secret);
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
-            return Base64.getEncoder().encodeToString(cipher.doFinal(strToEncrypt.getBytes("UTF-8")));
-        }
-        catch (Exception e)
-        {
+            cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+            String cipherText = Base64.getEncoder().encodeToString(cipher.doFinal(plaintext.getBytes("UTF-8")));
+            return cipherText;
+        } catch (Exception e) {
             System.out.println("Error while encrypting: " + e.toString());
         }
         return null;
     }
 
-    public static String decrypt(String strToDecrypt, String secret)
-    {
-        try
-        {
-            setKey(secret);
+    public static String decrypt(String ciphertext, String secret) {
+
+        try {
+            setSecretKey(secret);
             Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5PADDING");
-            cipher.init(Cipher.DECRYPT_MODE, secretKey);
-            return new String(cipher.doFinal(Base64.getDecoder().decode(strToDecrypt)));
+            cipher.init(Cipher.DECRYPT_MODE, secretKeySpec);
+            String plaintext = new String(cipher.doFinal(Base64.getDecoder().decode(ciphertext)));
+            return plaintext;
         }
-        catch (Exception e)
-        {
+        catch (Exception e) {
             System.out.println("Error while decrypting: " + e.toString());
         }
         return null;
